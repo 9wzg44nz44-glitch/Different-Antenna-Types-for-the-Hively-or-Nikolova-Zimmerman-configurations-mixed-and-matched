@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enhanced SLW / Longitudinal Potential Wave SNR Simulator</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#38bdf8;--accent2:#a78bfa;--text:#e2e8f0;--muted:#94a3b8;--success:#4ade80;--warning:#fbbf24;--danger:#f87171}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:var(--text);min-height:100vh;padding:20px;line-height:1.5}
+.container{max-width:1200px;margin:0 auto}
+header{text-align:center;margin-bottom:30px;padding:20px;background:rgba(30,41,59,.7);border-radius:16px;border:1px solid rgba(56,189,248,.3)}
+h1{font-size:1.7rem;background:linear-gradient(90deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.subtitle{color:var(--muted);font-size:.95rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:12px;padding:20px;border:1px solid rgba(148,163,184,.15);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.card h2{font-size:1.1rem;color:var(--accent);margin-bottom:12px}
+.card h3{font-size:.95rem;color:var(--accent2);margin:16px 0 8px}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+select,input[type=range]{width:100%;margin-bottom:12px}
+select{background:#0f172a;color:var(--text);border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:.9rem}
+.slider-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.slider-value{font-family:monospace;color:var(--accent);font-weight:600;min-width:70px;text-align:right}
+input[type=range]{-webkit-appearance:none;height:6px;background:#334155;border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--accent);border-radius:50%;cursor:pointer}
+.info-box{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);padding:10px 12px;margin:10px 0;font-size:.85rem;border-radius:0 6px 6px 0}
+.warning-box{background:rgba(251,191,36,.1);border-left:3px solid var(--warning);padding:10px 12px;margin:10px 0;font-size:.85rem;border-radius:0 6px 6px 0}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:15px}
+.metric{background:#0f172a;padding:12px;border-radius:8px;text-align:center}
+.metric .label{font-size:.75rem;color:var(--muted)}
+.metric .value{font-size:1.25rem;font-weight:700;font-family:monospace;margin-top:4px}
+.good{color:var(--success)}.ok{color:var(--warning)}.bad{color:var(--danger)}
+.full-width{grid-column:1/-1}
+.notes{font-size:.8rem;color:var(--muted);margin-top:20px;padding-top:15px;border-top:1px solid #334155}
+.notes ul{margin-left:18px;margin-top:6px}
+.notes li{margin-bottom:4px}
+.antenna-detail{background:#0f172a;padding:12px;border-radius:8px;margin-top:8px;font-size:.85rem}
+.purity-bar{height:8px;background:#334155;border-radius:4px;overflow:hidden;margin-top:6px}
+.purity-fill{height:100%;background:linear-gradient(90deg,#f87171,#fbbf24,#4ade80);transition:width .3s}
+footer{text-align:center;margin-top:30px;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>SLW / Longitudinal Potential Wave SNR Simulator</h1>
+<p class="subtitle">Interactive link budget with Hively pure-SLW antennas and Nikolova–Zimmerman potential-wave antennas (plasma detectors + gain horns/parabolics)</p>
+</header>
+
+<div class="grid">
+<div class="card">
+<h2>📡 Transmitter Antenna</h2>
+<label for="txAntenna">Select Transmitter Type</label>
+<select id="txAntenna" onchange="updateTxAntenna()">
+<option value="hively_bifilar">Hively Bifilar Coil (pure gradient / irrotational)</option>
+<option value="hively_monopole">Hively Monopole + Balun (high SLW purity)</option>
+<option value="zimmerman_waveguide">Zimmerman Waveguide-loaded Antenna (TEM-suppressed)</option>
+<option value="nz_dipole">Nikolova–Zimmerman Dipole (mixed currents)</option>
+<option value="nz_parabolic">Nikolova–Zimmerman Parabolic / Horn Gain Antenna</option>
+<option value="simple_monopole">Simple Monopole / Dipole (conventional, low purity)</option>
+</select>
+<div id="txDetail" class="antenna-detail"></div>
+<h3>Transmitter Parameters</h3>
+<div class="slider-row"><label>Frequency (MHz)</label><span class="slider-value" id="freqVal">1296</span></div>
+<input type="range" id="freq" min="100" max="15000" value="1296" step="1" oninput="update()">
+<div class="slider-row"><label>Tx Power (W)</label><span class="slider-value" id="txPowerVal">10</span></div>
+<input type="range" id="txPower" min="0.1" max="1000" value="10" step="0.1" oninput="update()">
+<div class="slider-row"><label>Tx Antenna Gain (dBi) for longitudinal/potential mode</label><span class="slider-value" id="txGainVal">0</span></div>
+<input type="range" id="txGain" min="-3" max="35" value="0" step="0.5" oninput="update()">
+<div class="slider-row"><label>SLW / Potential Purity Factor (0–1)</label><span class="slider-value" id="purityVal">0.95</span></div>
+<input type="range" id="purity" min="0.05" max="1" value="0.95" step="0.01" oninput="update()">
+<div class="purity-bar"><div class="purity-fill" id="purityBar" style="width:95%"></div></div>
+<div class="info-box" id="purityExplain">Purity ≈ fraction of radiated power in the desired irrotational / longitudinal-potential mode. Hively bifilar aims for near-1.0; conventional antennas are much lower.</div>
+</div>
+
+<div class="card">
+<h2>📥 Receiver / Detector Antenna</h2>
+<label for="rxAntenna">Select Receiver Type</label>
+<select id="rxAntenna" onchange="updateRxAntenna()">
+<option value="plasma">Zimmerman / Nikolova Biased Plasma / Fluorescent Tube</option>
+<option value="plasma_waveguide">Plasma Tube inside Waveguide (TEM-reject)</option>
+<option value="hively_bifilar_rx">Hively Bifilar Coil Receiver</option>
+<option value="horn_gain" selected>Horn / Parabolic Gain Antenna (range-extension choice)</option>
+<option value="simple_dipole_rx">Simple Dipole / Monopole</option>
+</select>
+<div id="rxDetail" class="antenna-detail"></div>
+<h3>Receiver Parameters</h3>
+<div class="slider-row"><label>Rx Antenna Gain (dBi)</label><span class="slider-value" id="rxGainVal">20</span></div>
+<input type="range" id="rxGain" min="-3" max="35" value="20" step="0.5" oninput="update()">
+<div class="slider-row"><label>Detector / System Noise Figure (dB)</label><span class="slider-value" id="nfVal">6</span></div>
+<input type="range" id="nf" min="1" max="20" value="6" step="0.5" oninput="update()">
+<div class="slider-row"><label>Receiver Bandwidth (kHz)</label><span class="slider-value" id="bwVal">10</span></div>
+<input type="range" id="bw" min="0.1" max="1000" value="10" step="0.1" oninput="update()">
+<div class="info-box">Zimmerman indicated that adding a high-gain horn (or similar) on the <em>receive</em> end of a working ~1.5 km link should extend practical range substantially. With gain antennas on both ends + selective detector, 10–20 km class performance becomes plausible depending on power, purity and noise.</div>
+</div>
+
+<div class="card">
+<h2>🔗 Link & Propagation</h2>
+<div class="slider-row"><label>Distance (km)</label><span class="slider-value" id="distVal">1.5</span></div>
+<input type="range" id="dist" min="0.01" max="50" value="1.5" step="0.01" oninput="update()">
+<div class="slider-row"><label>Path Exponent (≈2 free-space / Hively power)</label><span class="slider-value" id="nVal">2.0</span></div>
+<input type="range" id="n" min="1.5" max="4" value="2.0" step="0.1" oninput="update()">
+<label for="medium">Medium</label>
+<select id="medium" onchange="update()">
+<option value="air">Free Space / Air</option>
+<option value="earth">Earth / Soil</option>
+<option value="seawater">Seawater (SLW relative advantage)</option>
+</select>
+<div class="slider-row"><label>Extra Medium Attenuation (dB/km)</label><span class="slider-value" id="medAttVal">0</span></div>
+<input type="range" id="medAtt" min="0" max="50" value="0" step="0.1" oninput="update()">
+</div>
+
+<div class="card">
+<h2>📊 Link Budget & SNR Results</h2>
+<div class="result-grid">
+<div class="metric"><div class="label">Effective Tx Power in Mode</div><div class="value" id="pMode">—</div></div>
+<div class="metric"><div class="label">Path Loss</div><div class="value" id="pathLoss">—</div></div>
+<div class="metric"><div class="label">Received Power</div><div class="value" id="prx">—</div></div>
+<div class="metric"><div class="label">Noise Floor</div><div class="value" id="noise">—</div></div>
+<div class="metric"><div class="label">SNR</div><div class="value" id="snr">—</div></div>
+<div class="metric"><div class="label">Est. Max Range (SNR≈10 dB)</div><div class="value" id="maxRange">—</div></div>
+</div>
+<div id="snrStatus" class="info-box" style="margin-top:15px"></div>
+<h3>Quick Range Snapshots (current settings)</h3>
+<div class="result-grid" style="margin-top:8px">
+<div class="metric"><div class="label">1.5 km (Zimmerman baseline)</div><div class="value" id="snr15">—</div></div>
+<div class="metric"><div class="label">5 km</div><div class="value" id="snr5">—</div></div>
+<div class="metric"><div class="label">10 km</div><div class="value" id="snr10">—</div></div>
+<div class="metric"><div class="label">20 km</div><div class="value" id="snr20">—</div></div>
+</div>
+</div>
+</div>
+
+<div class="card full-width" style="margin-top:20px">
+<h2>📚 Physics Notes & References</h2>
+<div class="notes">
+<p><strong>Hively (US 9,306,527)</strong> requires pure gradient-driven (irrotational) currents for clean SLW. Bifilar coils cancel B and support only J=∇κ. High purity is needed for best match to a bifilar detector.</p>
+<p><strong>Nikolova & Zimmerman (QEX Jul/Aug 2011, US 8,165,531, 2007–2013 papers)</strong> demonstrated longitudinally polarized momentum / vector-potential waves. Documented ~1.5 km link at 1296 MHz using a waveguide-mounted transmit antenna and a biased fluorescent/plasma tube detector oriented to be relatively TEM-insensitive. Their patent shows a parabolic reflector + longitudinal dipole for directive longitudinal-A radiation.</p>
+<p>Zimmerman noted that placing a high-gain horn (or equivalent) on the receive side of a working link should enable much longer ranges. With gain antennas at both ends and a selective detector, 10–20 km class distances are a reasonable exploratory target in this simulator (exact numbers depend on power, purity, frequency and noise).</p>
+<ul>
+<li>Path loss uses a generalized free-space form with adjustable exponent (default 2) plus optional extra medium attenuation.</li>
+<li>Purity factor multiplies Tx power that contributes to the usable longitudinal/potential mode. Low purity wastes power into ordinary EM that selective detectors largely reject.</li>
+<li>Plasma detectors primarily sense the time-varying A; bifilar coils convert longitudinal E into gradient current.</li>
+<li>Educational tool only — real links depend on many practical factors (matching, orientation, interference, exact detector response) not fully modeled here.</li>
+</ul>
+</div>
+</div>
+<footer>Exploration tool for Hively EED/SLW and Nikolova–Zimmerman longitudinal potential-wave concepts</footer>
+</div>
+
+<script>
+const txInfo={
+hively_bifilar:{name:"Hively Bifilar Coil",desc:"Alternating bifilar winding → opposite currents in adjacent turns, net B≈0, near-zero L & C. Supports pure gradient-driven (irrotational) current J=∇κ. Highest SLW purity. Fully reciprocal as receiver.",defaultGain:0,defaultPurity:0.95},
+hively_monopole:{name:"Hively Monopole + Balun",desc:"Linear monopole with annular balun canceling outer-conductor return current. Strongly suppresses transverse modes while launching longitudinal E / SLW. High purity when well designed.",defaultGain:2,defaultPurity:0.85},
+zimmerman_waveguide:{name:"Zimmerman Waveguide-loaded Antenna",desc:"Transmit antenna inside a round waveguide (e.g. ~7-inch diameter). Attenuates ordinary TEM modes while allowing the longitudinal / potential component to leave. Used in the documented 1.5 km demonstration.",defaultGain:3,defaultPurity:0.70},
+nz_dipole:{name:"Nikolova–Zimmerman Dipole",desc:"Conventional or folded dipole. Produces a mixture of transverse EM and longitudinal-A components. Works, but lower purity means more power is wasted in ordinary radiation that selective detectors ignore.",defaultGain:2.15,defaultPurity:0.35},
+nz_parabolic:{name:"Nikolova–Zimmerman Parabolic / Horn Gain Antenna",desc:"Directive parabolic reflector with longitudinally oriented dipole at the focus (US 8,165,531). Provides substantial gain for the longitudinal-A mode — natural high-gain choice for longer ranges.",defaultGain:18,defaultPurity:0.65},
+simple_monopole:{name:"Simple Monopole / Dipole",desc:"Ordinary antenna with no special mode suppression. Lowest purity for SLW / potential waves. Most power radiates as classical transverse EM.",defaultGain:0,defaultPurity:0.15}
+};
+const rxInfo={
+plasma:{name:"Biased Plasma / Fluorescent Tube",desc:"DC-biased neon or fluorescent tube. Responds to time-varying vector potential A when bias current has a component parallel to propagation. Relatively TEM-insensitive when oriented correctly. Core of Zimmerman’s receiver.",defaultGain:0},
+plasma_waveguide:{name:"Plasma Tube inside Waveguide",desc:"Fluorescent/plasma tube mounted inside a waveguide section (Zimmerman experimental configuration). Further rejects TEM while coupling to the desired longitudinal/potential field.",defaultGain:2},
+hively_bifilar_rx:{name:"Hively Bifilar Coil Receiver",desc:"Same geometry as the pure-SLW transmitter. Converts incident longitudinal E into a gradient current at the terminals. Best matched to high-purity Hively transmissions; zero inductance, no eddy-current response.",defaultGain:0},
+horn_gain:{name:"Horn / Parabolic Gain Antenna",desc:"High-gain directive antenna. Zimmerman indicated that placing such a gain antenna on the receive end of a working link should enable substantially longer ranges (conceptually 10–20 km class with good Tx gain/power and selective detection). Increases effective aperture for the longitudinal component.",defaultGain:20},
+simple_dipole_rx:{name:"Simple Dipole / Monopole",desc:"Conventional antenna. Picks up both ordinary EM and any longitudinal component, but lacks selectivity or special matching to pure SLW.",defaultGain:2.15}
+};
+
+function updateTxAntenna(){
+const key=document.getElementById('txAntenna').value;
+const info=txInfo[key];
+document.getElementById('txDetail').innerHTML=`<strong>${info.name}</strong><br>${info.desc}`;
+document.getElementById('txGain').value=info.defaultGain;
+document.getElementById('purity').value=info.defaultPurity;
+update();
+}
+function updateRxAntenna(){
+const key=document.getElementById('rxAntenna').value;
+const info=rxInfo[key];
+document.getElementById('rxDetail').innerHTML=`<strong>${info.name}</strong><br>${info.desc}`;
+document.getElementById('rxGain').value=info.defaultGain;
+update();
+}
+function db(x){return 10*Math.log10(x)}
+function calcSNR(distKm){
+const freqMHz=+document.getElementById('freq').value;
+const txPowerW=+document.getElementById('txPower').value;
+const txGain_dBi=+document.getElementById('txGain').value;
+const purity=+document.getElementById('purity').value;
+const rxGain_dBi=+document.getElementById('rxGain').value;
+const nf_dB=+document.getElementById('nf').value;
+const bw_kHz=+document.getElementById('bw').value;
+const n=+document.getElementById('n').value;
+const medAtt_dBkm=+document.getElementById('medAtt').value;
+const pMode_W=txPowerW*purity;
+const pMode_dBm=db(pMode_W*1000);
+const freqHz=freqMHz*1e6;
+const lambda=3e8/freqHz;
+const dist_m=distKm*1000;
+const fspl_1m_dB=20*Math.log10(4*Math.PI/lambda);
+const pathLoss_dB=fspl_1m_dB+10*n*Math.log10(dist_m)+medAtt_dBkm*distKm;
+const prx_dBm=pMode_dBm+txGain_dBi+rxGain_dBi-pathLoss_dB;
+const bw_Hz=bw_kHz*1000;
+const noise_dBm=-174+10*Math.log10(bw_Hz)+nf_dB;
+const snr_dB=prx_dBm-noise_dBm;
+return{pMode_dBm,pathLoss_dB,prx_dBm,noise_dBm,snr_dB};
+}
+function update(){
+document.getElementById('freqVal').textContent=document.getElementById('freq').value;
+document.getElementById('txPowerVal').textContent=(+document.getElementById('txPower').value).toFixed(1);
+document.getElementById('txGainVal').textContent=document.getElementById('txGain').value;
+document.getElementById('purityVal').textContent=(+document.getElementById('purity').value).toFixed(2);
+document.getElementById('purityBar').style.width=(+document.getElementById('purity').value*100)+'%';
+document.getElementById('rxGainVal').textContent=document.getElementById('rxGain').value;
+document.getElementById('nfVal').textContent=document.getElementById('nf').value;
+document.getElementById('bwVal').textContent=document.getElementById('bw').value;
+document.getElementById('distVal').textContent=(+document.getElementById('dist').value).toFixed(2);
+document.getElementById('nVal').textContent=document.getElementById('n').value;
+document.getElementById('medAttVal').textContent=document.getElementById('medAtt').value;
+const dist=+document.getElementById('dist').value;
+const res=calcSNR(dist);
+document.getElementById('pMode').textContent=res.pMode_dBm.toFixed(1)+' dBm';
+document.getElementById('pathLoss').textContent=res.pathLoss_dB.toFixed(1)+' dB';
+document.getElementById('prx').textContent=res.prx_dBm.toFixed(1)+' dBm';
+document.getElementById('noise').textContent=res.noise_dBm.toFixed(1)+' dBm';
+const snrEl=document.getElementById('snr');
+snrEl.textContent=res.snr_dB.toFixed(1)+' dB';
+snrEl.className='value '+(res.snr_dB>15?'good':res.snr_dB>6?'ok':'bad');
+const status=document.getElementById('snrStatus');
+if(res.snr_dB>15){status.className='info-box';status.innerHTML='Strong link (SNR > 15 dB). Comfortable demodulation expected.';}
+else if(res.snr_dB>6){status.className='info-box';status.innerHTML='Marginal-to-usable link (SNR ≈ 6–15 dB). Narrowband or robust coding recommended.';}
+else{status.className='warning-box';status.innerHTML='Weak or unusable link (SNR < 6 dB). Increase power, gain, purity, or reduce distance/bandwidth.';}
+let lo=0.01,hi=100;
+for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(calcSNR(mid).snr_dB>10)lo=mid;else hi=mid;}
+document.getElementById('maxRange').textContent=lo.toFixed(2)+' km';
+const s15=calcSNR(1.5).snr_dB,s5=calcSNR(5).snr_dB,s10=calcSNR(10).snr_dB,s20=calcSNR(20).snr_dB;
+['snr15','snr5','snr10','snr20'].forEach((id,i)=>{const v=[s15,s5,s10,s20][i];const el=document.getElementById(id);el.textContent=v.toFixed(1)+' dB';el.className='value '+(v>10?'good':v>3?'ok':'bad');});
+}
+updateTxAntenna();updateRxAntenna();update();
+</script>
+</body>
+</html>
